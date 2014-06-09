@@ -6,9 +6,6 @@ namespace :noop do
 
   desc 'Check that the repository is reachable'
   task :check do
-    on release_roles :all do
-      exit 1 unless strategy.check
-    end
   end
 
   desc 'Clone the repo to the cache'
@@ -21,11 +18,6 @@ namespace :noop do
 
   desc 'Copy repo to releases'
   task :create_release do
-    on release_roles :all do
-      within repo_path do
-        execute :ln, '-s', repo_path, release_path
-      end
-    end
   end
 end
 
