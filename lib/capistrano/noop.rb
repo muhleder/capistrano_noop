@@ -10,6 +10,7 @@ class Capistrano::Noop < Capistrano::SCM
     end
 
     def check
+      test! " [ -d #{repo_url} ] "
     end
 
     def clone
