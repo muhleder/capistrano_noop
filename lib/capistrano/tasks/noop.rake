@@ -18,8 +18,10 @@ namespace :noop do
 
   desc 'Copy repo to releases'
   task :create_release do
-    within repo_url do
-      execute :ln, '-s', repo_url, release_path
+    on release_roles :all do
+      within repo_url do
+        execute :ln, '-s', repo_url, release_path
+      end
     end
   end
 end
