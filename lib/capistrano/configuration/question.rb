@@ -2,23 +2,27 @@ module Capistrano
   class Configuration
     class Question
 
-      def initialize(key, default, options = {})
-        @key, @default, @options = key, default, options
+      def initialize(env, key, default)
+        @env, @key, @default = env, key, default
       end
 
       def call
         ask_question
-        value_or_default
+        save_response
       end
 
       private
-      attr_reader :key, :default, :options
+      attr_reader :env, :key, :default
 
       def ask_question
-        $stdout.print question
+        $stdout.puts question
       end
 
-      def value_or_default
+      def save_response
+        env.set(key, value)
+      end
+
+      def value
         if response.empty?
           default
         else
@@ -27,27 +31,11 @@ module Capistrano
       end
 
       def response
-        return @response if defined? @response
-        
-        @response = (gets || "").chomp
-      end
-      
-      def gets
-        if echo?
-          $stdin.gets
-        else
-          $stdin.noecho(&:gets).tap{ $stdout.print "\n" }
-        end
-      rescue Errno::EIO
-        # when stdio gets closed
-      end
-        
-      def question
-        I18n.t(:question, key: key, default_value: default, scope: :capistrano)
+        @response ||= $stdin.gets.chomp
       end
 
-      def echo?
-        (options || {}).fetch(:echo, true)
+      def question
+        I18n.t(:question, key: key, default_value: default, scope: :capistrano)
       end
     end
   end

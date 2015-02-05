@@ -15,7 +15,7 @@ describe Capistrano::DSL do
         dsl.server 'example2.com', roles: %w{web}
         dsl.server 'example3.com', roles: %w{app web}, active: true
         dsl.server 'example4.com', roles: %w{app}, primary: true
-        dsl.server 'example5.com', roles: %w{db}, no_release: true, active:true
+        dsl.server 'example5.com', roles: %w{db}, no_release: true
       end
 
       describe 'fetching all servers' do
@@ -36,10 +36,10 @@ describe Capistrano::DSL do
           end
         end
 
-        context 'with property filter options' do
+        context 'with filter options' do
           subject { dsl.release_roles(:all, filter: :active) }
 
-          it 'returns all release servers that match the property filter' do
+          it 'returns all release servers that match the filter' do
             expect(subject.map(&:hostname)).to eq %w{example1.com example3.com}
           end
         end
@@ -92,43 +92,11 @@ describe Capistrano::DSL do
           end
         end
 
-        context 'when the attribute `primary` is explicitly set' do
+        context 'when the attribute `primary` is explicity set' do
           subject { dsl.primary(:app) }
           it 'returns the servers' do
             expect(subject.hostname).to eq 'example4.com'
           end
-        end
-      end
-
-      describe 'setting an internal host filter' do
-        subject { dsl.roles(:app) }
-        it 'is ignored' do
-          dsl.set :filter, { host: 'example3.com' }
-          expect(subject.map(&:hostname)).to eq(['example3.com', 'example4.com'])
-        end
-      end
-
-      describe 'setting an internal role filter' do
-        subject { dsl.roles(:app) }
-        it 'ignores it' do
-          dsl.set :filter, { role: :web }
-          expect(subject.map(&:hostname)).to eq(['example3.com','example4.com'])
-        end
-      end
-
-      describe 'setting an internal host and role filter' do
-        subject { dsl.roles(:app) }
-        it 'ignores it' do
-          dsl.set :filter, { role: :web, host: 'example1.com' }
-          expect(subject.map(&:hostname)).to eq(['example3.com','example4.com'])
-        end
-      end
-
-      describe 'setting an internal regexp host filter' do
-        subject { dsl.roles(:all) }
-        it 'is ignored' do
-          dsl.set :filter, { host: /1/ }
-          expect(subject.map(&:hostname)).to eq(%w{example1.com example2.com example3.com example4.com example5.com})
         end
       end
 
@@ -250,11 +218,11 @@ describe Capistrano::DSL do
 
       describe 'fetching servers for a role' do
         it 'roles defined using the `server` syntax are included' do
-          expect(dsl.roles(:web).size).to eq(2)
+          expect(dsl.roles(:web)).to have(2).items
         end
 
         it 'roles defined using the `role` syntax are included' do
-          expect(dsl.roles(:app).size).to eq(2)
+          expect(dsl.roles(:app)).to have(2).items
         end
       end
 
@@ -315,7 +283,7 @@ describe Capistrano::DSL do
   describe 'asking for a variable' do
     before do
       dsl.ask(:scm, :svn)
-      $stdout.stubs(:print)
+      $stdout.stubs(:puts)
     end
 
     context 'variable is provided' do
@@ -349,22 +317,22 @@ describe Capistrano::DSL do
     context 'variable is an non-empty array' do
       let(:linked_files) { %w{1} }
 
-      it { expect(subject).to be_truthy }
+      it { should be_true }
     end
 
     context 'variable is an empty array' do
       let(:linked_files) { [] }
-      it { expect(subject).to be_falsey }
+      it { should be_false }
     end
 
     context 'variable exists, is not an array' do
       let(:linked_files) { stub }
-      it { expect(subject).to be_truthy }
+      it { should be_true }
     end
 
     context 'variable is nil' do
       let(:linked_files) { nil }
-      it { expect(subject).to be_falsey }
+      it { should be_false }
     end
   end
 
@@ -400,7 +368,7 @@ describe Capistrano::DSL do
     end
 
     it 'sets the backend pty' do
-      expect(backend.pty).to be_truthy
+      expect(backend.pty).to be_true
     end
 
     it 'sets the backend connection timeout' do
@@ -415,90 +383,109 @@ describe Capistrano::DSL do
 
   end
 
-  describe 'local_user' do
+  describe 'release path' do
+
     before do
-      dsl.set :local_user, -> { Etc.getlogin }
+      dsl.set(:deploy_to, '/var/www')
     end
 
-    describe 'fetching local_user' do
-      subject { dsl.local_user }
+    describe 'fetching release path' do
+      subject { dsl.release_path }
 
-      context 'where a local_user is not set' do
+      context 'where no release path has been set' do
         before do
-          Etc.expects(:getlogin).returns('login')
+          dsl.delete(:release_path)
         end
 
-        it 'returns the login name' do
-          expect(subject.to_s).to eq 'login'
+        it 'returns the `current_path` value' do
+          expect(subject.to_s).to eq '/var/www/current'
         end
       end
 
-      context 'where a local_user is set' do
+      context 'where the release path has been set' do
         before do
-          dsl.set(:local_user, -> { 'custom login' })
+          dsl.set(:release_path, '/var/www/release_path')
         end
 
-        it 'returns the custom name' do
-          expect(subject.to_s).to eq 'custom login'
+        it 'returns the set `release_path` value' do
+          expect(subject.to_s).to eq '/var/www/release_path'
+        end
+      end
+    end
+
+    describe 'setting release path' do
+      let(:now) { Time.parse("Oct 21 16:29:00 2015") }
+      subject { dsl.release_path }
+
+      context 'without a timestamp' do
+        before do
+          dsl.env.expects(:timestamp).returns(now)
+          dsl.set_release_path
+        end
+
+        it 'returns the release path with the current env timestamp' do
+          expect(subject.to_s).to eq '/var/www/releases/20151021162900'
+        end
+      end
+
+      context 'with a timestamp' do
+        before do
+          dsl.set_release_path('timestamp')
+        end
+
+        it 'returns the release path with the timestamp' do
+          expect(subject.to_s).to eq '/var/www/releases/timestamp'
+        end
+      end
+    end
+
+    describe 'setting deploy configuration path' do
+      subject { dsl.deploy_config_path.to_s }
+
+      context 'where no config path is set' do
+        before do
+          dsl.delete(:deploy_config_path)
+        end
+
+        it 'returns "config/deploy.rb"' do
+          expect(subject).to eq 'config/deploy.rb'
+        end
+      end
+
+      context 'where a custom path is set' do
+        before do
+          dsl.set(:deploy_config_path, 'my/custom/path.rb')
+        end
+
+        it 'returns the custom path' do
+          expect(subject).to eq 'my/custom/path.rb'
+        end
+      end
+    end
+
+    describe 'setting stage configuration path' do
+      subject { dsl.stage_config_path.to_s }
+
+      context 'where no config path is set' do
+
+        before do
+          dsl.delete(:stage_config_path)
+        end
+
+        it 'returns "config/deploy"' do
+          expect(subject).to eq 'config/deploy'
+        end
+      end
+
+      context 'where a custom path is set' do
+        before do
+          dsl.set(:stage_config_path, 'my/custom/path')
+        end
+
+        it 'returns the custom path' do
+          expect(subject).to eq 'my/custom/path'
         end
       end
     end
   end
-
-  describe 'on()' do
-
-    before do
-      dsl.server 'example1.com', roles: %w{web}, active: true
-      dsl.server 'example2.com', roles: %w{web}
-      dsl.server 'example3.com', roles: %w{app web}, active: true
-      dsl.server 'example4.com', roles: %w{app}, primary: true
-      dsl.server 'example5.com', roles: %w{db}, no_release: true
-      @coordinator = mock('coordinator')
-      @coordinator.expects(:each).returns(nil)
-      ENV.delete 'ROLES'
-      ENV.delete 'HOSTS'
-
-    end
-
-    it 'filters by role from the :filter variable' do
-      hosts = dsl.roles(:web)
-      all = dsl.roles(:all)
-      SSHKit::Coordinator.expects(:new).with(hosts).returns(@coordinator)
-      dsl.set :filter, { role: 'web' }
-      dsl.on(all)
-    end
-
-    it 'filters by host and role from the :filter variable' do
-      all = dsl.roles(:all)
-      SSHKit::Coordinator.expects(:new).with([]).returns(@coordinator)
-      dsl.set :filter, { role: 'db', host: 'example3.com' }
-      dsl.on(all)
-    end
-
-    it 'filters from ENV[ROLES]' do
-      hosts = dsl.roles(:db)
-      all = dsl.roles(:all)
-      SSHKit::Coordinator.expects(:new).with(hosts).returns(@coordinator)
-      ENV['ROLES'] = 'db'
-      dsl.on(all)
-    end
-
-    it 'filters from ENV[HOSTS]' do
-      hosts = dsl.roles(:db)
-      all = dsl.roles(:all)
-      SSHKit::Coordinator.expects(:new).with(hosts).returns(@coordinator)
-      ENV['HOSTS'] = 'example5.com'
-      dsl.on(all)
-    end
-
-    it 'filters by ENV[HOSTS] && ENV[ROLES]' do
-      all = dsl.roles(:all)
-      SSHKit::Coordinator.expects(:new).with([]).returns(@coordinator)
-      ENV['HOSTS'] = 'example5.com'
-      ENV['ROLES'] = 'web'
-      dsl.on(all)
-    end
-
-  end
-
 end

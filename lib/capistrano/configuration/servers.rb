@@ -1,29 +1,26 @@
 require 'set'
-require 'capistrano/configuration'
-require 'capistrano/configuration/filter'
-
+require_relative 'servers/role_filter'
+require_relative 'servers/host_filter'
 module Capistrano
   class Configuration
     class Servers
       include Enumerable
 
       def add_host(host, properties={})
-        servers.add server(host, properties).with(properties)
+        servers.add server(host).with(properties)
       end
 
       def add_role(role, hosts, options={})
-        options_deepcopy = Marshal.dump(options.merge(roles: role))
-        Array(hosts).each { |host| add_host(host, Marshal.load(options_deepcopy)) }
+        Array(hosts).each { |host| add_host(host, options.merge(roles: role)) }
       end
 
       def roles_for(names)
         options = extract_options(names)
-        s = Filter.new(:role, names).filter(servers)
-        s.select { |server| server.select?(options) }
+        fetch_roles(names, options)
       end
 
       def fetch_primary(role)
-        hosts = roles_for([role])
+        hosts = fetch(role)
         hosts.find(&:primary) || hosts.first
       end
 
@@ -33,11 +30,29 @@ module Capistrano
 
       private
 
-      def server(host, properties)
-        new_host = Server[host]
-        new_host.with({user: properties[:user]}) unless properties[:user].nil?
-        new_host.with({port: properties[:port]}) unless properties[:port].nil?
-        servers.find { |server| server.matches? new_host } || new_host
+      def server(host)
+        servers.find { |server| server.matches? Server[host] } || Server[host]
+      end
+
+      def fetch(role)
+        servers.find_all { |server| server.has_role? role}
+      end
+
+      def fetch_roles(required, options)
+        filter_roles = RoleFilter.for(required, available_roles)
+        HostFilter.for(select(servers_with_roles(filter_roles), options))
+      end
+
+      def servers_with_roles(roles)
+        roles.flat_map { |role| fetch role }.uniq
+      end
+
+      def select(servers, options)
+        servers.select { |server| server.select?(options) }
+      end
+
+      def available_roles
+        servers.flat_map { |server| server.roles_array }.uniq
       end
 
       def servers

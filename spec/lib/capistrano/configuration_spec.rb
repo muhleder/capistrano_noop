@@ -5,17 +5,10 @@ module Capistrano
     let(:config) { Configuration.new }
     let(:servers) { stub }
 
-    describe '.new' do
-      it 'accepts initial hash' do
-        configuration = described_class.new(custom: 'value')
-        expect(configuration.fetch(:custom)).to eq('value')
-      end
-    end
-
     describe '.env' do
       it 'is a global accessor to a single instance' do
         Configuration.env.set(:test, true)
-        expect(Configuration.env.fetch(:test)).to be_truthy
+        expect(Configuration.env.fetch(:test)).to be_true
       end
     end
 
@@ -51,19 +44,6 @@ module Capistrano
         end
 
         it 'returns the set value' do
-          expect(subject).to eq :value
-        end
-      end
-
-      context 'set_if_empty' do
-        it 'sets the value when none is present' do
-          config.set_if_empty(:key, :value)
-          expect(subject).to eq :value
-        end
-
-        it 'does not overwrite the value' do
-          config.set(:key, :value)
-          config.set_if_empty(:key, :update)
           expect(subject).to eq :value
         end
       end
@@ -116,32 +96,12 @@ module Capistrano
         end
       end
 
-      context 'lambda with parameters' do
-        subject { config.fetch(:key, lambda { |c| c }).call(42) }
-        it 'is returned as a lambda' do
-          expect(subject).to eq 42
-        end
-      end
-
       context 'block is passed to fetch' do
         subject { config.fetch(:key, :default) { fail 'we need this!' } }
 
         it 'returns the block value' do
           expect { subject }.to raise_error
         end
-      end
-    end
-
-    describe 'keys' do
-      subject { config.keys }
-
-      before do
-        config.set(:key1, :value1)
-        config.set(:key2, :value2)
-      end
-
-      it 'returns all set keys' do
-        expect(subject).to match_array [:key1, :key2]
       end
     end
 
@@ -158,15 +118,14 @@ module Capistrano
 
     describe 'asking' do
       let(:question) { stub }
-      let(:options) { Hash.new }
 
       before do
-        Configuration::Question.expects(:new).with(:branch, :default, options).
+        Configuration::Question.expects(:new).with(config, :branch, :default).
           returns(question)
       end
 
       it 'prompts for the value when fetching' do
-        config.ask(:branch, :default, options)
+        config.ask(:branch, :default)
         expect(config.fetch(:branch)).to eq question
       end
     end

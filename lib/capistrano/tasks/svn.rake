@@ -40,13 +40,4 @@ namespace :svn do
       end
     end
   end
-
-  desc 'Determine the revision that will be deployed'
-  task :set_current_revision do
-    on release_roles :all do
-      within repo_path do
-        set :current_revision, strategy.fetch_revision
-      end
-    end
-  end
 end

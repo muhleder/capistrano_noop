@@ -1,33 +1,23 @@
-# Capistrano [![Build Status](https://travis-ci.org/capistrano/capistrano.svg?branch=master)](https://travis-ci.org/capistrano/capistrano) [![Code Climate](http://img.shields.io/codeclimate/github/capistrano/capistrano.svg)](https://codeclimate.com/github/capistrano/capistrano) <a href="http://codersclan.net/?repo_id=325&source=small"><img src="http://img.shields.io/badge/get-support-blue.svg"></a>
-
-## Documentation
-
-Check out the [online documentation](http://capistranorb.com) of Capistrano 3 hosted via this [repository](https://github.com/capistrano/capistrano.github.io).
-
-## Support
-
-Need help with getting Capistrano up and running? Got a code problem you want to get solved quickly?
-
-Get <a href="http://codersclan.net/?repo_id=325&source=link">Capistrano support on CodersClan.</a> <a href="http://codersclan.net/?repo_id=325&source=big"><img src="http://www.codersclan.net/gs_button/?repo_id=325" width="150"></a>
+# Capistrano [![Build Status](https://travis-ci.org/capistrano/capistrano.png?branch=v3)](https://travis-ci.org/capistrano/capistrano) [![Code Climate](https://codeclimate.com/github/capistrano/capistrano.png)](https://codeclimate.com/github/capistrano/capistrano) <a href="http://codersclan.net/?repo_id=325&source=small"><img src="http://www.codersclan.net/gs_button/?repo_id=325&size=small" width="69"></a>
 
 ## Requirements
 
-* Ruby >= 1.9.3 (JRuby and C-Ruby/YARV are supported)
+* Ruby >= 1.9 (JRuby and C-Ruby/YARV are supported)
 
-Capistrano support these source code version control systems out of the box:
+## Support
 
-* Git 1.8 or higher
-* Mercurial
-* SVN
+Need help with getting Capistrano up and running? Got a code problem you want to get solved quickly? 
 
-Binaries for these VCS might be required on the local and/or the remote systems.
+Get <a href="http://codersclan.net/?repo_id=325&source=link">Capistrano support on CodersClan.</a>
+
+<a href="http://codersclan.net/?repo_id=325&source=big"><img src="http://www.codersclan.net/gs_button/?repo_id=325" width="200"></a>
 
 ## Installation
 
 Add this line to your application's Gemfile:
 
 ``` ruby
-gem 'capistrano', '~> 3.3.0'
+gem 'capistrano', '~> 3.1.0'
 ```
 
 And then execute:
@@ -65,66 +55,201 @@ $ bundle exec cap install STAGES=local,sandbox,qa,production
 ## Usage
 
 ``` sh
-# list all available tasks
-$ bundle exec cap -T
+$ bundle exec cap -vT
 
-# deploy to the staging environment
 $ bundle exec cap staging deploy
-
-# deploy to the production environment
 $ bundle exec cap production deploy
 
-# simulate deploying to the production environment
-# does not actually do anything
 $ bundle exec cap production deploy --dry-run
-
-# list task dependencies
 $ bundle exec cap production deploy --prereqs
-
-# trace through task invocations
 $ bundle exec cap production deploy --trace
 ```
 
-## Testing
+## Tasks
 
-Capistrano has two test suites: an RSpec suite and a Cucumber suite. The
-RSpec suite handles quick feedback unit specs. The Cucumber features are
-an integration suite that uses Vagrant to deploy to a real virtual
-server. In order to run the Cucumber suite you will need to install
-[Vagrant](http://www.vagrantup.com/) and Vagrant supported
-virtualization software like
-[VirtualBox](https://www.virtualbox.org/wiki/Downloads).
-
-```
-# To run the RSpec suite
-$ rake spec
-
-# To run the Cucumber suite
-$ rake features
-
-# To run the Cucumber suite and leave the VM running (faster for subsequent runs)
-$ rake features KEEP_RUNNING=1
+``` ruby
+server 'example.com', roles: [:web, :app]
+server 'example.org', roles: [:db, :workers]
+desc "Report Uptimes"
+task :uptime do
+  on roles(:all) do |host|
+    execute :any_command, "with args", :here, "and here"
+    info "Host #{host} (#{host.roles.to_a.join(', ')}):\t#{capture(:uptime)}"
+  end
+end
 ```
 
-## Metrics
+**Note**:
 
-Since version 3.3.3 Capistrano includes anonymous metrics. The metric server,
-gem collection, and when it exists, the HTML/d3 page to view the metrics are
-all open-source and available for inspection and audit at
-https://github.com/capistrano/stats
+**tl;dr**: `execute(:bundle, :install)` and `execute('bundle install')` don't behave identically!
 
-**Notes for CI**: If you commit the file `.capistrano/metrics` to your source
-control, you will not be prompted again, this is what we expect you to do, and
-it should also avoid breaking your CI server by blocking waiting for an answer
-on standard in. The metric prompt is also [disabled when standard in is not a
-tty](https://github.com/capistrano/stats/blob/77c9993d3ee604520712261aa2a70c90f3b96a6f/gem/lib/capistrano-stats/metric-collector.rb#L53)
-(when using Capistrano from scripts, or from some well behaved CI services)
+`execute()` has a subtle behaviour. When calling `within './directory' { execute(:bundle, :install) }` for example, the first argument to `execute()` is a *Stringish* with ***no whitespace***. This allows the command to pass through the [SSHKit::CommandMap](https://github.com/capistrano/sshkit#the-command-map) which enables a number of powerful features.
 
-* The gem invites users to opt-into metrics collection when the task
-  `load:defaults` is called. A project-specific hash derived from the output of
-  `git config remote.origin.url` is written to a file `.capistrano/metrics` to
-  allow us to differentiate between many members of the same team deploying the
-  same project vs. many people on many projects.
+When the first argument to `execute()` contains whitespace, for example `within './directory' { execute('bundle install') }` (or when using a heredoc), Capistrano, nor SSHKit can reliably predict how it should be shell escaped, and thus cannot perform any context, or command mapping, that means that the `within(){}` (as well as `with()`, `as()`, etc) have no effect. There have been a few attempts to resolve this, but we don't consider it a bug, although we acknowledge that it might be a little counter intuitive.
+## Before / After
+
+Where calling on the same task name, executed in order of inclusion
+
+``` ruby
+# call an existing task
+before :starting, :ensure_user
+
+after :finishing, :notify
+
+
+# or define in block
+before :starting, :ensure_user do
+  #
+end
+
+after :finishing, :notify do
+  #
+end
+```
+
+If it makes sense for your use case (often, that means *generating a file*)
+the Rake prerequisite mechanism can be used:
+
+``` ruby
+desc "Create Important File"
+file 'important.txt' do |t|
+  sh "touch #{t.name}"
+end
+desc "Upload Important File"
+task :upload => 'important.txt' do |t|
+  on roles(:all) do
+    upload!(t.prerequisites.first, '/tmp')
+  end
+end
+```
+
+The final way to call out to other tasks is to simply `invoke()` them:
+
+``` ruby
+task :one do
+  on roles(:all) { info "One" }
+end
+task :two do
+  invoke :one
+  on roles(:all) { info "Two" }
+end
+```
+
+This method is widely used.
+
+## Getting User Input
+
+``` ruby
+desc "Ask about breakfast"
+task :breakfast do
+  ask(:breakfast, "pancakes")
+  on roles(:all) do |h|
+    execute "echo \"$(whoami) wants #{fetch(:breakfast)} for breakfast!\""
+  end
+end
+```
+
+Perfect, who needs telephones.
+
+
+## Running local tasks
+
+Local tasks can be run by replacing `on` with `run_locally`
+
+``` ruby
+desc 'Notify service of deployment'
+task :notify do
+  run_locally do
+    with rails_env: :development do
+      rake 'service:notify'
+    end
+  end
+end
+```
+
+Of course, you can always just use standard ruby syntax to run things locally
+``` ruby
+desc 'Notify service of deployment'
+task :notify do
+  %x('RAILS_ENV=development bundle exec rake "service:notify"')
+end
+```
+
+Alternatively you could use the rake syntax
+``` ruby
+desc "Notify service of deployment"
+task :notify do
+   sh 'RAILS_ENV=development bundle exec rake "service:notify"'
+end
+```
+## Console
+
+**Note:** Here be dragons. The console is very immature, but it's much more
+cleanly architected than previous incarnations and it'll only get better from
+here on in.
+
+Execute arbitrary remote commands, to use this simply add
+`require 'capistrano/console'` which will add the necessary tasks to your
+environment:
+
+``` sh
+$ bundle exec cap staging console
+```
+
+Then, after setting up the server connections, this is how that might look:
+
+``` sh
+$ bundle exec cap production console
+capistrano console - enter command to execute on production
+production> uptime
+ INFO [94db8027] Running /usr/bin/env uptime on leehambley@example.com:22
+DEBUG [94db8027] Command: /usr/bin/env uptime
+DEBUG [94db8027]   17:11:17 up 50 days, 22:31,  1 user,  load average: 0.02, 0.02, 0.05
+ INFO [94db8027] Finished in 0.435 seconds command successful.
+production> who
+ INFO [9ce34809] Running /usr/bin/env who on leehambley@example.com:22
+DEBUG [9ce34809] Command: /usr/bin/env who
+DEBUG [9ce34809]  leehambley pts/0        2013-06-13 17:11 (port-11262.pppoe.wtnet.de)
+ INFO [9ce34809] Finished in 0.420 seconds command successful.
+```
+
+## A word about PTYs
+
+There is a configuration option which asks the backend driver to ask the remote host
+to assign the connection a *pty*. A *pty* is a pseudo-terminal, which in effect means
+*tell the backend that this is an **interactive** session*. This is normally a bad idea.
+
+Most of the differences are best explained by [this page](https://github.com/sstephenson/rbenv/wiki/Unix-shell-initialization) from the author of *rbenv*.
+
+**When Capistrano makes a connection it is a *non-login*, *non-interactive* shell.
+This was not an accident!**
+
+It's often used as a band aid to cure issues related to RVM and rbenv not loading login
+and shell initialisation scripts. In these scenarios RVM and rbenv are the tools at fault,
+or at least they are being used incorrectly.
+
+Whilst, especially in the case of language runtimes (Ruby, Node, Python and friends in
+particular) there is a temptation to run multiple versions in parallel on a single server
+and to switch between them using environmental variables, this is an anti-pattern, and
+symptomatic of bad design (e.g. you're testing a second version of Ruby in production because
+your company lacks the infrastructure to test this in a staging environment).
+
+## Configuration
+
+The following variables are settable:
+
+| Variable Name         | Description                                                          | Notes                                                           |
+|:---------------------:|----------------------------------------------------------------------|-----------------------------------------------------------------|
+| `:repo_url`           | The URL of your scm repository (git, hg, svn)                        | file://, https://, ssh://, or svn+ssh:// are all supported      |
+| `:branch`             | The branch you wish to deploy                                        | This only has meaning for git and hg repos, to specify the branch of an svn repo, set `:repo_url` to the branch location. |
+| `:scm`                | The source control system used                                       | `:git`, `:hg`, `:svn` are currently supported                   |
+| `:tmp_dir`            | The (optional) temp directory that will be used (default: /tmp)      | if you have a shared web host, this setting may need to be set (i.e. /home/user/tmp/capistrano). |
+
+__Support removed__ for following variables:
+
+| Variable Name         | Description                                                         | Notes                                                           |
+|:---------------------:|---------------------------------------------------------------------|-----------------------------------------------------------------|
+| `:copy_exclude`       | The (optional) array of files and/or folders excluded from deploy | Replaced by Git's native `.gitattributes`, see [#515](https://github.com/capistrano/capistrano/issues/515) for more info. |
 
 ## SSHKit
 
@@ -137,7 +262,7 @@ a good example).
 
 MIT License (MIT)
 
-Copyright (c) 2012-2015 Tom Clements, Lee Hambley
+Copyright (c) 2012-2013 Tom Clements, Lee Hambley
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

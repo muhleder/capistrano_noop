@@ -1,5 +1,4 @@
 Then(/^references in the remote repo are listed$/) do
-  expect(@output).to include('refs/heads/master')
 end
 
 Then(/^the shared path is created$/) do
@@ -23,6 +22,13 @@ Then(/^directories referenced in :linked_files are created in shared$/) do
   end
 end
 
+Then(/^the task will be successful$/) do
+end
+
+
+Then(/^the task will exit$/) do
+end
+
 Then(/^the repo is cloned$/) do
   run_vagrant_command(test_dir_exists(TestApp.repo_path))
 end
@@ -32,8 +38,9 @@ Then(/^the release is created$/) do
 end
 
 Then(/^file symlinks are created in the new release$/) do
+  pending
   TestApp.linked_files.each do |file|
-    run_vagrant_command(test_symlink_exists(TestApp.current_path.join(file)))
+    run_vagrant_command(test_symlink_exists(TestApp.release_path.join(file)))
   end
 end
 
@@ -50,26 +57,26 @@ end
 
 Then(/^the deploy\.rb file is created$/) do
   file = TestApp.test_app_path.join('config/deploy.rb')
-  expect(File.exists?(file)).to be true
+  expect(File.exists?(file)).to be_true
 end
 
 Then(/^the default stage files are created$/) do
   staging = TestApp.test_app_path.join('config/deploy/staging.rb')
   production = TestApp.test_app_path.join('config/deploy/production.rb')
-  expect(File.exists?(staging)).to be true
-  expect(File.exists?(production)).to be true
+  expect(File.exists?(staging)).to be_true
+  expect(File.exists?(production)).to be_true
 end
 
 Then(/^the tasks folder is created$/) do
   path = TestApp.test_app_path.join('lib/capistrano/tasks')
-  expect(Dir.exists?(path)).to be true
+  expect(Dir.exists?(path)).to be_true
 end
 
 Then(/^the specified stage files are created$/) do
   qa = TestApp.test_app_path.join('config/deploy/qa.rb')
   production = TestApp.test_app_path.join('config/deploy/production.rb')
-  expect(File.exists?(qa)).to be true
-  expect(File.exists?(production)).to be true
+  expect(File.exists?(qa)).to be_true
+  expect(File.exists?(production)).to be_true
 end
 
 Then(/^it creates the file with the remote_task prerequisite$/) do
@@ -83,11 +90,7 @@ Then(/^it will not recreate the file$/) do
 end
 
 Then(/^the task is successful$/) do
-  expect(@success).to be true
-end
-
-Then(/^the task fails$/) do
-  expect(@success).to be_falsey
+  expect(@success).to be_true
 end
 
 Then(/^the failure task will run$/) do
@@ -97,19 +100,10 @@ end
 
 Then(/^the failure task will not run$/) do
   failed = TestApp.shared_path.join('failed')
-  expect { run_vagrant_command(test_file_exists(failed)) }
-    .to raise_error(VagrantHelpers::VagrantSSHCommandError)
+  !run_vagrant_command(test_file_exists(failed))
 end
 
 When(/^an error is raised$/) do
   error = TestApp.shared_path.join('fail')
   run_vagrant_command(test_file_exists(error))
-end
-
-Then(/contains "(.*?)" in the output/) do |expected|
-  expect(@output).to include(expected)
-end
-
-Then(/doesn't contain "(.*?)" in the output/) do |expected|
-  expect(@output).not_to include(expected)
 end

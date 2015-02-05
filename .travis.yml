@@ -3,11 +3,8 @@ rvm:
   - 2.1.0
   - 2.0.0
   - 1.9.3
-  - rbx-2
+  - 1.9.2
+  - rbx
 script: bundle exec rake spec
-install: bundle install --jobs=1
 cache: bundler
-branches:
-  except:
-    - legacy-v2
-sudo: false
+bundler_args: --without cucumber

@@ -6,8 +6,7 @@ Feature: Deploy
 
   Scenario: Creating the repo
     When I run cap "git:check"
-    Then the task is successful
-    And references in the remote repo are listed
+    Then references in the remote repo are listed
 
   Scenario: Creating the directory structure
     When I run cap "deploy:check:directories"
@@ -23,16 +22,16 @@ Feature: Deploy
     Then directories referenced in :linked_files are created in shared
 
   Scenario: Checking linked files - missing file
-    Given a linked file "missing_file.txt"
-    But file "missing_file.txt" does not exist in shared path
+    Given a required file
+    But the file does not exist
     When I run cap "deploy:check:linked_files"
-    Then the task fails
+    Then the task will exit
 
   Scenario: Checking linked files - file exists
-    Given a linked file "existing_file.txt"
-    And file "existing_file.txt" exists in shared path
+    Given a required file
+    And that file exists
     When I run cap "deploy:check:linked_files"
-    Then the task is successful
+    Then the task will be successful
 
   Scenario: Creating a release
     Given I run cap "deploy:check:directories"
@@ -41,7 +40,7 @@ Feature: Deploy
     And the release is created
 
   Scenario: Symlink linked files
-    When I run cap "deploy:symlink:linked_files deploy:symlink:release" as part of a release
+    When I run cap "deploy:symlink:linked_files" as part of a release
     Then file symlinks are created in the new release
 
   Scenario: Symlink linked dirs
