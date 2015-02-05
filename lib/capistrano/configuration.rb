@@ -1,27 +1,34 @@
+require_relative 'configuration/filter'
 require_relative 'configuration/question'
-require_relative 'configuration/servers'
 require_relative 'configuration/server'
+require_relative 'configuration/servers'
 
 module Capistrano
   class Configuration
 
-    class << self
-      def env
-        @env ||= new
-      end
-
-      def reset!
-        @env = new
-      end
+    def initialize(config = nil)
+      @config ||= config
     end
 
-    def ask(key, default=nil)
-      question = Question.new(self, key, default)
+    def self.env
+      @env ||= new
+    end
+
+    def self.reset!
+      @env = new
+    end
+
+    def ask(key, default=nil, options={})
+      question = Question.new(key, default, options)
       set(key, question)
     end
 
     def set(key, value)
       config[key] = value
+    end
+
+    def set_if_empty(key, value)
+      config[key] = value unless config.has_key? key
     end
 
     def delete(key)
@@ -30,10 +37,14 @@ module Capistrano
 
     def fetch(key, default=nil, &block)
       value = fetch_for(key, default, &block)
-      while value.respond_to?(:call)
+      while callable_without_parameters?(value)
         value = set(key, value.call)
       end
       return value
+    end
+
+    def keys
+      config.keys
     end
 
     def role(name, hosts, options={})
@@ -80,7 +91,29 @@ module Capistrano
       @timestamp ||= Time.now.utc
     end
 
+    def setup_filters
+      @filters = cmdline_filters.clone
+      @filters << Filter.new(:role, ENV['ROLES']) if ENV['ROLES']
+      @filters << Filter.new(:host, ENV['HOSTS']) if ENV['HOSTS']
+      fh = fetch_for(:filter,{})
+      @filters << Filter.new(:host, fh[:host]) if fh[:host]
+      @filters << Filter.new(:role, fh[:role]) if fh[:role]
+    end
+
+    def add_cmdline_filter(type, values)
+      cmdline_filters << Filter.new(type, values)
+    end
+
+    def filter list
+      setup_filters if @filters.nil?
+      @filters.reduce(list) { |l,f| f.filter l }
+    end
+
     private
+
+    def cmdline_filters
+      @cmdline_filters ||= []
+    end
 
     def servers
       @servers ||= Servers.new
@@ -98,5 +131,8 @@ module Capistrano
       end
     end
 
+    def callable_without_parameters?(x)
+      x.respond_to?(:call) && ( !x.respond_to?(:arity) || x.arity == 0)
+    end
   end
 end

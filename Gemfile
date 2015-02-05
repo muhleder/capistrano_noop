@@ -4,10 +4,6 @@ source 'https://rubygems.org'
 gemspec
 
 group :cucumber do
-  gem 'kuroko'
   gem 'cucumber'
-end
-
-platforms :rbx do
-  gem 'rubysl', '~> 2.0'
+  gem 'rspec', '~> 3.0.0'
 end

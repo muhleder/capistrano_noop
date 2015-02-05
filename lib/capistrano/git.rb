@@ -18,7 +18,7 @@ class Capistrano::Git < Capistrano::SCM
     end
 
     def check
-      test! :git, :'ls-remote', repo_url
+      git :'ls-remote --heads', repo_url
     end
 
     def clone
@@ -30,7 +30,17 @@ class Capistrano::Git < Capistrano::SCM
     end
 
     def release
-      git :archive, fetch(:branch), '| tar -x -C', release_path
+      if tree = fetch(:repo_tree)
+        tree = tree.slice %r#^/?(.*?)/?$#, 1
+        components = tree.split('/').size
+        git :archive, fetch(:branch), tree, "| tar -x --strip-components #{components} -f - -C", release_path
+      else
+        git :archive, fetch(:branch), '| tar -x -f - -C', release_path
+      end
+    end
+
+    def fetch_revision
+      context.capture(:git, "rev-list --max-count=1 --abbrev-commit #{fetch(:branch)}")
     end
   end
 end

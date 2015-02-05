@@ -1,3 +1,5 @@
+require 'capistrano/upload_task'
+
 module Capistrano
   module TaskEnhancements
     def before(task, prerequisite, *args, &block)
@@ -19,12 +21,12 @@ module Capistrano
     end
 
     def define_remote_file_task(task, target_roles)
-      Rake::Task.define_task(task) do |t|
+      Capistrano::UploadTask.define_task(task) do |t|
         prerequisite_file = t.prerequisites.first
         file = shared_path.join(t.name)
 
         on roles(target_roles) do
-          unless test "[ -f #{file} ]"
+          unless test "[ -f #{file.to_s.shellescape} ]"
             info "Uploading #{prerequisite_file} to #{file}"
             upload! File.open(prerequisite_file), file
           end
@@ -51,7 +53,7 @@ module Capistrano
     end
 
     def exit_deploy_because_of_exception(ex)
-      warn t(:deploy_failed, ex: ex.inspect)
+      warn t(:deploy_failed, ex: ex.message)
       invoke 'deploy:failed'
       exit(false)
     end

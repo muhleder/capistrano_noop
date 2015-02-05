@@ -60,9 +60,19 @@ module Capistrano
       it "should run svn export" do        
         context.expects(:release_path).returns(:path)
         
-        context.expects(:execute).with(:svn, :export, '.', :path)
+        context.expects(:execute).with(:svn, :export, '--force', '.', :path)
 
         subject.release
+      end
+    end
+
+    describe "#fetch_revision" do
+      it "should run fetch revision" do
+        context.expects(:repo_path).returns(:path)
+
+        context.expects(:capture).with(:svnversion, :path)
+
+        subject.fetch_revision
       end
     end
   end

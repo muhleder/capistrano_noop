@@ -11,11 +11,13 @@ module Capistrano
 
       def add_roles(roles)
         Array(roles).each { |role| add_role(role) }
+        self
       end
       alias roles= add_roles
 
       def add_role(role)
         roles.add role.to_sym
+        self
       end
 
       def has_role?(role)
@@ -23,8 +25,19 @@ module Capistrano
       end
 
       def select?(options)
-        selector = Selector.for(options)
-        selector.call(self)
+        options.each do |k,v|
+          callable = v.respond_to?(:call) ? v: ->(server){server.fetch(v)}
+          result = case k
+          when :filter, :select
+            callable.call(self)
+          when :exclude
+            !callable.call(self)
+          else
+            self.fetch(k) == v
+          end
+          return false unless result
+        end
+        return true
       end
 
       def primary
@@ -40,11 +53,9 @@ module Capistrano
         @properties ||= Properties.new
       end
 
-      def netssh_options_with_options
-        @netssh_options ||= netssh_options_without_options.merge( fetch(:ssh_options) || {} )
+      def netssh_options
+        @netssh_options ||= super.merge( fetch(:ssh_options) || {} )
       end
-      alias_method :netssh_options_without_options, :netssh_options
-      alias_method :netssh_options, :netssh_options_with_options
 
       def roles_array
         roles.to_a
@@ -71,7 +82,16 @@ module Capistrano
         end
 
         def set(key, value)
-          @properties[key] = value
+          pval = @properties[key]
+          if pval.is_a? Hash and value.is_a? Hash
+            pval.merge!(value)
+          elsif pval.is_a? Set and value.is_a? Set
+            pval.merge(value)
+          elsif pval.is_a? Array and value.is_a? Array
+            pval.concat value
+          else
+            @properties[key] = value
+          end
         end
 
         def fetch(key)
@@ -86,6 +106,10 @@ module Capistrano
           @roles ||= Set.new
         end
 
+        def keys
+          @properties.keys
+        end
+
         def method_missing(key, value=nil)
           if value
             set(lvalue(key), value)
@@ -98,55 +122,6 @@ module Capistrano
 
         def lvalue(key)
           key.to_s.chomp('=').to_sym
-        end
-
-      end
-
-      class Selector
-        def initialize(options)
-          @options = options
-        end
-
-        def self.for(options)
-          if options.has_key?(:exclude)
-            Exclusive
-          else
-            self
-          end.new(options)
-        end
-
-        def callable
-          if key.respond_to?(:call)
-            key
-          else
-            ->(server) { server.fetch(key) }
-          end
-        end
-
-        def call(server)
-          callable.call(server)
-        end
-
-        private
-        attr_reader :options
-
-        def key
-          options[:filter] || options[:select] || all
-        end
-
-        def all
-          ->(server) { :all }
-        end
-
-        class Exclusive < Selector
-
-          def key
-            options[:exclude]
-          end
-
-          def call(server)
-            !callable.call(server)
-          end
         end
 
       end
