@@ -1,9 +1,7 @@
-require 'etc'
 require 'capistrano/dsl/task_enhancements'
 require 'capistrano/dsl/paths'
 require 'capistrano/dsl/stages'
 require 'capistrano/dsl/env'
-require 'capistrano/configuration/filter'
 
 module Capistrano
   module DSL
@@ -28,13 +26,19 @@ module Capistrano
       execute :sudo, *args
     end
 
+    def capturing_revisions(&block)
+      set :previous_revision, fetch_revision
+      block.call
+      set :current_revision, fetch_revision
+    end
+
     def revision_log_message
       fetch(:revision_log_message,
         t(:revision_log_message,
           branch: fetch(:branch),
           user: local_user,
           sha: fetch(:current_revision),
-          release: fetch(:release_timestamp))
+          release: release_timestamp)
        )
     end
 
@@ -43,22 +47,17 @@ module Capistrano
     end
 
     def local_user
-      fetch(:local_user)
+      `whoami`
     end
 
     def lock(locked_version)
       VersionValidator.new(locked_version).verify
     end
 
-    def on(hosts, options={}, &block)
-      subset = Configuration.env.filter hosts
-      SSHKit::Coordinator.new(subset).each(options, &block)
+    private
+    def fetch_revision
+      capture("cd #{repo_path} && git rev-parse --short HEAD")
     end
-
-    def run_locally(&block)
-      SSHKit::Backend::Local.new(&block).run
-    end
-
   end
 end
 self.extend Capistrano::DSL

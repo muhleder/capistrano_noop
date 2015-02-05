@@ -1,6 +1,4 @@
 require 'fileutils'
-require 'pathname'
-
 module TestApp
   extend self
 
@@ -59,12 +57,6 @@ module TestApp
     end
   end
 
-  def append_to_deploy_file(config)
-    File.open(test_stage_path, 'a') do |file|
-      file.write config + "\n"
-    end
-  end
-
   def prepend_to_capfile(config)
     current_capfile = File.read(capfile)
     File.open(capfile, 'w') do |file|
@@ -86,11 +78,10 @@ module TestApp
   end
 
   def run(command)
-    output = nil
     Dir.chdir(test_app_path) do
-      output = %x[#{command}]
+      %x[#{command}]
     end
-    [$?.success?, output]
+    $?.success?
   end
 
   def stage

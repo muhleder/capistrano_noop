@@ -27,14 +27,14 @@ module Capistrano
         before do
           dsl.set(:stage, :sandbox)
         end
-        it { expect(subject).to be_truthy }
+        it { should be_true }
       end
 
       context 'stage is not set' do
         before do
           dsl.set(:stage, nil)
         end
-        it { expect(subject).to be_falsey }
+        it { should be_false }
       end
     end
 

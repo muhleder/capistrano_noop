@@ -6,6 +6,9 @@ module Capistrano
         Dir[stage_definitions].map { |f| File.basename(f, '.rb') }
       end
 
+      def infer_stages_from_stage_files
+      end
+
       def stage_definitions
         stage_config_path.join('*.rb')
       end
